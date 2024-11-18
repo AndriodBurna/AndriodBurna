@@ -1,0 +1,117 @@
+*{
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    font-family: sans-serif;
+}
+.wrapper{
+    width: 80%;
+    margin: 0 auto;
+    padding: 1%;
+}
+.nav-bar{
+    border-bottom: 1px solid grey;
+}
+.text-cont{
+    text-align: center;
+}
+ul{
+    list-style-type: none;
+}
+ul li{
+    display: inline;
+    padding: 1%;
+}
+ul li a{
+    text-decoration: none;
+    font-weight: bold;
+    color: #ff6b81;
+}
+.clearfix{
+    float: none;
+    clear: both;
+}
+/* css for  main sec */
+.main-content{
+    background-color: #f1f2f0;
+    padding: 3% 0;
+}
+.tbl_full{
+    width: 112%;
+    
+}
+.tbl_full tr th{
+    border-bottom: 1px solid #000;
+    text-align: left;
+    padding: 1%;
+}
+.tbl_full tr  td{
+    padding: 1%;
+}
+
+.btn-primary{
+    background-color: #1e90ff;
+    color: #fff;
+    padding: 1%;
+    font-weight: bold;
+    text-decoration: none;
+}
+.btn-primary:hover{
+    background-color: #3742fa;
+}
+.btn-secondary{
+    background-color: #7bed9f;
+    color: #000;
+    padding: 1%;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+}
+.btn-secondary:hover{
+    background-color: #2ed573;
+}
+.btn-danger{
+    background-color: #ff6b81;
+    color: #fff;
+    padding: 1%;
+    font-weight: bold;
+    text-decoration: none;
+}
+.btn-danger:hover{
+    background-color: #ff4757;
+}
+
+.success{
+    color: #2ed573;
+}
+.error{
+    color: #ff4757;
+}
+
+.col-4{
+    margin: 1%;
+    padding: 2%;
+    background-color: white;
+    text-align: center;
+    width: 20%;
+    float: left;
+}
+
+.tbl_admin{
+    width: 25%;
+}
+.tbl_admin input{
+    margin-top: 7px;
+    padding: 3%;
+}
+footer{
+    background-color: #ff4357;
+}
+
+/* css for login */
+.login{
+    width: 20%;
+    border: 1px solid grey;
+    margin: 5% auto;
+    padding: 2%;
+}
