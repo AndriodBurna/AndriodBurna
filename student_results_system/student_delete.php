@@ -1,44 +1,20 @@
 <?php
-if(isset($_POST["id"]) && !empty($_POST["id"])){
-    require_once "config.php";
+include "config.php";
+include "includes/auth.php";
 
-    $sql = "DELETE FROM students WHERE id = ?";
-
-    if($stmt = $conn->prepare($sql)){
-        $stmt->bind_param("i", $param_id);
-
-        $param_id = trim($_POST["id"]);
-
-        if($stmt->execute()){
-            header("location: student_list.php");
-            exit();
-        } else{
-            echo "Oops! Something went wrong. Please try again later.";
-        }
-    }
-
-    $stmt->close();
-
-    $conn->close();
-} else{
-    if(empty(trim($_GET["id"]))){
-        header("location: error.php");
-        exit();
-    }
+if ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'teacher') {
+    die("Access denied!");
 }
-?>
-<?php include 'includes/header.php'; ?>
-<div class="container">
-    <h2>Delete Student</h2>
-    <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
-        <div class="alert alert-danger" role="alert">
-            <input type="hidden" name="id" value="<?php echo trim($_GET["id"]); ?>"/>
-            <p>Are you sure you want to delete this record?</p><br>
-            <p>
-                <input type="submit" value="Yes" class="btn btn-danger">
-                <a href="student_list.php" class="btn btn-default">No</a>
-            </p>
-        </div>
-    </form>
-</div>
-<?php include 'includes/footer.php'; ?>
+
+$id = intval($_GET['id']);
+
+// Only delete students
+$stmt = $conn->prepare("DELETE FROM users WHERE id=? AND role='student'");
+$stmt->bind_param("i", $id);
+
+if ($stmt->execute()) {
+    header("Location: student_manage.php?deleted=1");
+    exit;
+} else {
+    die("Error deleting student: " . $stmt->error);
+}

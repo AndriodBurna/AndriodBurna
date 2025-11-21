@@ -1,103 +1,105 @@
 <?php
-include 'includes/auth.php';
-include 'includes/header.php';
-require_once "config.php";
+include "config.php";
+include "includes/auth.php";
+include "includes/header.php";
 
-$student_id = $name = "";
-$student_id_err = $name_err = "";
+if ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'teacher') {
+    die("Access denied!");
+}
 
-if(isset($_POST["id"]) && !empty($_POST["id"])){
-    $id = $_POST["id"];
+$id = intval($_GET['id']);
+$stmt = $conn->prepare("SELECT username, full_name, email, course_id, admission_year FROM users WHERE id=? AND role='student'");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$student = $stmt->get_result()->fetch_assoc();
 
-    if(empty(trim($_POST["student_id"]))){
-        $student_id_err = "Please enter student ID.";
-    } else{
-        $student_id = trim($_POST["student_id"]);
-    }
+if (!$student) {
+    die("Student not found!");
+}
 
-    if(empty(trim($_POST["name"]))){
-        $name_err = "Please enter name.";
-    } else{
-        $name = trim($_POST["name"]);
-    }
+$success = '';
+$error = '';
 
-    if(empty($student_id_err) && empty($name_err)){
-        $sql = "UPDATE students SET student_id=?, name=? WHERE id=?";
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $full_name = trim($_POST['full_name']);
+    $email     = trim($_POST['email']);
+    $course_id = isset($_POST['course_id']) && $_POST['course_id'] !== '' ? (int)$_POST['course_id'] : null;
+    $admission_year = intval($_POST['admission_year']);
+    $new_password = trim($_POST['new_password']);
 
-        if($stmt = $conn->prepare($sql)){
-            $stmt->bind_param("ssi", $param_student_id, $param_name, $param_id);
-
-            $param_student_id = $student_id;
-            $param_name = $name;
-            $param_id = $id;
-
-            if($stmt->execute()){
-                header("location: student_list.php");
-                exit();
-            } else{
-                echo "Something went wrong. Please try again later.";
-            }
-
-            $stmt->close();
+    // Validate that course_id exists (if not null)
+    if ($course_id !== null) {
+        $cq = $conn->prepare("SELECT id FROM courses WHERE id = ?");
+        $cq->bind_param("i", $course_id);
+        $cq->execute();
+        $cqres = $cq->get_result();
+        if ($cqres->num_rows === 0) {
+            // invalid course_id, set to null
+            $course_id = null;
         }
+        $cq->close();
     }
 
-    $conn->close();
-} else{
-    if(isset($_GET["id"]) && !empty(trim($_GET["id"]))){
-        $id =  trim($_GET["id"]);
+    if ($new_password !== '') {
+        $hashed = password_hash($new_password, PASSWORD_DEFAULT);
+        $sql = "UPDATE users SET full_name=?, email=?, course_id=?, admission_year=?, password=? WHERE id=?";
+        $stmt2 = $conn->prepare($sql);
+        $stmt2->bind_param("ssisis", $full_name, $email, $course_id, $admission_year, $hashed, $id);
+    } else {
+        $sql = "UPDATE users SET full_name=?, email=?, course_id=?, admission_year=? WHERE id=?";
+        $stmt2 = $conn->prepare($sql);
+        $stmt2->bind_param("ssisi", $full_name, $email, $course_id, $admission_year, $id);
+    }
 
-        $sql = "SELECT * FROM students WHERE id = ?";
-        if($stmt = $conn->prepare($sql)){
-            $stmt->bind_param("i", $param_id);
-
-            $param_id = $id;
-
-            if($stmt->execute()){
-                $result = $stmt->get_result();
-
-                if($result->num_rows == 1){
-                    $row = $result->fetch_array(MYSQLI_ASSOC);
-
-                    $student_id = $row["student_id"];
-                    $name = $row["name"];
-                } else{
-                    header("location: error.php");
-                    exit();
-                }
-
-            } else{
-                echo "Oops! Something went wrong. Please try again later.";
-            }
-
-            $stmt->close();
-        }
-
-        $conn->close();
-    }  else{
-        header("location: error.php");
-        exit();
+    if ($stmt2->execute()) {
+        $success = "Student updated successfully!";
+        // Refresh student data
+        $stmt = $conn->prepare("SELECT username, full_name, email, course_id, admission_year FROM users WHERE id=? AND role='student'");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $student = $stmt->get_result()->fetch_assoc();
+    } else {
+        $error = "Error: " . $stmt2->error;
     }
 }
 ?>
 
-<div class="container">
-    <h2>Edit Student</h2>
-    <form action="<?php echo htmlspecialchars(basename($_SERVER['REQUEST_URI'])); ?>" method="post">
-        <div class="form-group <?php echo (!empty($student_id_err)) ? 'has-error' : ''; ?>">
-            <label>Student ID</label>
-            <input type="text" name="student_id" class="form-control" value="<?php echo $student_id; ?>">
-            <span class="help-block"><?php echo $student_id_err; ?></span>
-        </div>
-        <div class="form-group <?php echo (!empty($name_err)) ? 'has-error' : ''; ?>">
-            <label>Name</label>
-            <input type="text" name="name" class="form-control" value="<?php echo $name; ?>">
-            <span class="help-block"><?php echo $name_err; ?></span>
-        </div>
-        <input type="hidden" name="id" value="<?php echo $id; ?>"/>
-        <input type="submit" class="btn btn-primary" value="Submit">
-        <a href="student_list.php" class="btn btn-default">Cancel</a>
-    </form>
-</div>
+<h2>Edit Student</h2>
+<?php if ($success) echo "<p style='color:green;'>$success</p>"; ?>
+<?php if ($error) echo "<p style='color:red;'>$error</p>"; ?>
 
-<?php include 'includes/footer.php'; ?>
+<form method="post">
+    <label>Assign Course:</label><br>
+    <select name="course_id">
+        <option value="">-- None --</option>
+        <?php
+        $cRes = $conn->query("SELECT id, course_name FROM courses ORDER BY course_name ASC");
+        while ($c = $cRes->fetch_assoc()):
+        ?>
+            <option value="<?= $c['id'] ?>"
+                <?= ($student['course_id'] !== null && $student['course_id'] == $c['id']) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($c['course_name']) ?>
+            </option>
+        <?php endwhile; ?>
+    </select><br>
+
+    <label>Username (cannot change)</label><br>
+    <input type="text" value="<?= htmlspecialchars($student['username']) ?>" disabled><br>
+
+    <label>Full Name</label><br>
+    <input type="text" name="full_name" value="<?= htmlspecialchars($student['full_name']) ?>"><br>
+
+    <label>Email</label><br>
+    <input type="email" name="email" value="<?= htmlspecialchars($student['email']) ?>"><br>
+
+    <label>Admission Year</label><br>
+    <input type="number" name="admission_year" min="1900" max="<?= date('Y') ?>"
+           value="<?= htmlspecialchars($student['admission_year']) ?>"><br>
+
+    <h4>Change password (optional)</h4>
+    <input type="password" name="new_password" placeholder="Leave blank to keep old password"><br>
+
+    <button type="submit" class="btn">Update</button>
+</form>
+
+<?php include "includes/footer.php"; ?>

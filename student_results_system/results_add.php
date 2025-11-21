@@ -1,144 +1,87 @@
 <?php
-include 'includes/auth.php';
-include 'includes/header.php';
-require_once "config.php";
+include "config.php";
+include "includes/auth.php";
 
-$student_id = $term_id = $class_id = $subject_id = $marks = "";
-$student_id_err = $term_id_err = $class_id_err = $subject_id_err = $marks_err = "";
+if ($_SESSION['role'] !== 'admin' && $_SESSION['role'] !== 'teacher') {
+    die("Access denied!");
+}
 
-if($_SERVER["REQUEST_METHOD"] == "POST"){
-    if(empty(trim($_POST["student_id"]))){
-        $student_id_err = "Please select a student.";
-    } else{
-        $student_id = trim($_POST["student_id"]);
+// Step 1: Get students
+$students = $conn->query("SELECT id, full_name, username, course_id FROM users WHERE role='student' ORDER BY full_name ASC");
+
+$student_id = $_POST['student_id'] ?? null;
+$course_id = null;
+$subjects = [];
+
+// Step 2: If a student is chosen, fetch their course + subjects
+if ($student_id) {
+    $stmt = $conn->prepare("SELECT course_id FROM users WHERE id=? AND role='student'");
+    $stmt->bind_param("i", $student_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($row = $res->fetch_assoc()) {
+        $course_id = $row['course_id'];
     }
 
-    if(empty(trim($_POST["term_id"]))){
-        $term_id_err = "Please select a term.";
-    } else{
-        $term_id = trim($_POST["term_id"]);
-    }
-
-    if(empty(trim($_POST["class_id"]))){
-        $class_id_err = "Please select a class.";
-    } else{
-        $class_id = trim($_POST["class_id"]);
-    }
-
-    if(empty(trim($_POST["subject_id"]))){
-        $subject_id_err = "Please select a subject.";
-    } else{
-        $subject_id = trim($_POST["subject_id"]);
-    }
-
-    if(empty(trim($_POST["marks"]))){
-        $marks_err = "Please enter the marks.";
-    } else{
-        $marks = trim($_POST["marks"]);
-    }
-
-    if(empty($student_id_err) && empty($term_id_err) && empty($class_id_err) && empty($subject_id_err) && empty($marks_err)){
-        $grade = "";
-        if ($marks >= 90) {
-            $grade = "A+";
-        } elseif ($marks >= 80) {
-            $grade = "A";
-        } elseif ($marks >= 70) {
-            $grade = "B";
-        } elseif ($marks >= 60) {
-            $grade = "C";
-        } elseif ($marks >= 50) {
-            $grade = "D";
-        } else {
-            $grade = "F";
-        }
-
-        $sql = "INSERT INTO results (student_id, term_id, class_id, subject_id, marks, grade) VALUES (?, ?, ?, ?, ?, ?)";
-
-        if($stmt = $conn->prepare($sql)){
-            $stmt->bind_param("iiiiss", $param_student_id, $param_term_id, $param_class_id, $param_subject_id, $param_marks, $param_grade);
-
-            $param_student_id = $student_id;
-            $param_term_id = $term_id;
-            $param_class_id = $class_id;
-            $param_subject_id = $subject_id;
-            $param_marks = $marks;
-            $param_grade = $grade;
-
-            if($stmt->execute()){
-                header("location: results_list.php");
-            } else{
-                echo "Something went wrong. Please try again later.";
-            }
-        }
+    if ($course_id) {
+        $stmt = $conn->prepare("SELECT s.id, s.subject_name, s.subject_code 
+                                FROM subjects s
+                                JOIN course_subject cs ON cs.subject_id = s.id
+                                WHERE cs.course_id=?");
+        $stmt->bind_param("i", $course_id);
+        $stmt->execute();
+        $subjects = $stmt->get_result();
     }
 }
 
-$sql_students = "SELECT * FROM students";
-$result_students = $conn->query($sql_students);
+// Step 3: Insert result
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['marks'])) {
+    $student_id = $_POST['student_id'];
+    $subject_id = $_POST['subject_id'];
+    $marks      = $_POST['marks'];
 
-$sql_terms = "SELECT * FROM terms";
-$result_terms = $conn->query($sql_terms);
+    $stmt = $conn->prepare("INSERT INTO results (student_id, subject_id, marks) VALUES (?, ?, ?)");
+    $stmt->bind_param("iii", $student_id, $subject_id, $marks);
+    $stmt->execute();
 
-$sql_classes = "SELECT * FROM classes";
-$result_classes = $conn->query($sql_classes);
+    $success = "Result added successfully!";
+}
 
-$sql_subjects = "SELECT * FROM subjects";
-$result_subjects = $conn->query($sql_subjects);
+include "includes/header.php";
 ?>
 
-<div class="container">
-    <h2>Add Result</h2>
-    <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
-        <div class="form-group <?php echo (!empty($student_id_err)) ? 'has-error' : ''; ?>">
-            <label>Student</label>
-            <select name="student_id" class="form-control">
-                <option value="">Select Student</option>
-                <?php while($row = $result_students->fetch_assoc()): ?>
-                <option value="<?php echo $row['id']; ?>"><?php echo $row['name']; ?></option>
-                <?php endwhile; ?>
-            </select>
-            <span class="help-block"><?php echo $student_id_err;?></span>
-        </div>
-        <div class="form-group <?php echo (!empty($term_id_err)) ? 'has-error' : ''; ?>">
-            <label>Term</label>
-            <select name="term_id" class="form-control">
-                <option value="">Select Term</option>
-                <?php while($row = $result_terms->fetch_assoc()): ?>
-                <option value="<?php echo $row['id']; ?>"><?php echo $row['name']; ?></option>
-                <?php endwhile; ?>
-            </select>
-            <span class="help-block"><?php echo $term_id_err;?></span>
-        </div>
-        <div class="form-group <?php echo (!empty($class_id_err)) ? 'has-error' : ''; ?>">
-            <label>Class</label>
-            <select name="class_id" class="form-control">
-                <option value="">Select Class</option>
-                <?php while($row = $result_classes->fetch_assoc()): ?>
-                <option value="<?php echo $row['id']; ?>"><?php echo $row['name']; ?></option>
-                <?php endwhile; ?>
-            </select>
-            <span class="help-block"><?php echo $class_id_err;?></span>
-        </div>
-        <div class="form-group <?php echo (!empty($subject_id_err)) ? 'has-error' : ''; ?>">
-            <label>Subject</label>
-            <select name="subject_id" class="form-control">
-                <option value="">Select Subject</option>
-                <?php while($row = $result_subjects->fetch_assoc()): ?>
-                <option value="<?php echo $row['id']; ?>"><?php echo $row['name']; ?></option>
-                <?php endwhile; ?>
-            </select>
-            <span class="help-block"><?php echo $subject_id_err;?></span>
-        </div>
-        <div class="form-group <?php echo (!empty($marks_err)) ? 'has-error' : ''; ?>">
-            <label>Marks</label>
-            <input type="text" name="marks" class="form-control" value="<?php echo $marks; ?>">
-            <span class="help-block"><?php echo $marks_err;?></span>
-        </div>
-        <div class="form-group">
-            <input type="submit" class="btn btn-primary" value="Add Result">
-        </div>
-    </form>
-</div>
+<h2>Add Student Result</h2>
 
-<?php include 'includes/footer.php'; ?>
+<?php if (isset($success)) echo "<p style='color:green;'>$success</p>"; ?>
+
+<form method="post">
+    <label>Select Student:</label><br>
+    <select name="student_id" onchange="this.form.submit()">
+        <option value="">-- Choose Student --</option>
+        <?php while ($s = $students->fetch_assoc()): ?>
+            <option value="<?= $s['id'] ?>" <?= ($student_id==$s['id']?'selected':'') ?>>
+                <?= htmlspecialchars($s['full_name']) ?> (<?= htmlspecialchars($s['username']) ?>)
+            </option>
+        <?php endwhile; ?>
+    </select><br><br>
+
+    <?php if ($course_id && $subjects->num_rows > 0): ?>
+        <label>Subject:</label><br>
+        <select name="subject_id" required>
+            <?php while ($sub = $subjects->fetch_assoc()): ?>
+                <option value="<?= $sub['id'] ?>">
+                    <?= htmlspecialchars($sub['subject_name']) ?> (<?= htmlspecialchars($sub['subject_code']) ?>)
+                </option>
+            <?php endwhile; ?>
+        </select><br><br>
+
+        <label>Marks:</label><br>
+        <input type="number" name="marks" required><br><br>
+
+        <button type="submit">Save Result</button>
+    <?php elseif ($student_id): ?>
+        <p style="color:red;">No subjects assigned for this student's course.</p>
+    <?php endif; ?>
+</form>
+
+<?php include "includes/footer.php"; ?>

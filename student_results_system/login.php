@@ -1,91 +1,57 @@
 <?php
 session_start();
+include "config.php";
 
-if(isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true){
-    header("location: index.php");
-    exit;
-}
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $user = $_POST['username'];
+    $pass = $_POST['password'];
 
-require_once "config.php";
+    $sql = "SELECT * FROM users WHERE username=? LIMIT 1";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("s", $user);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
 
-$username = $password = "";
-$username_err = $password_err = "";
-
-if($_SERVER["REQUEST_METHOD"] == "POST"){
-
-    if(empty(trim($_POST["username"]))){
-        $username_err = "Please enter username.";
-    } else{
-        $username = trim($_POST["username"]);
+    if ($row && password_verify($pass, $row['password'])) {
+        $_SESSION['user_id']  = $row['id'];
+        $_SESSION['role']     = $row['role'];
+        $_SESSION['username'] = $row['username'];
+        header("Location: index.php");
+        exit;
+    } else {
+        $error = "Invalid login!";
     }
-    
-    if(empty(trim($_POST["password"]))){
-        $password_err = "Please enter your password.";
-    } else{
-        $password = trim($_POST["password"]);
-    }
-    
-    if(empty($username_err) && empty($password_err)){
-        $sql = "SELECT id, username, password, role FROM users WHERE username = ?";
-        
-        if($stmt = $conn->prepare($sql)){
-            $stmt->bind_param("s", $param_username);
-            
-            $param_username = $username;
-            
-            if($stmt->execute()){
-                $stmt->store_result();
-                
-                if($stmt->num_rows == 1){
-                    $stmt->bind_result($id, $username, $hashed_password, $role);
-                    if($stmt->fetch()){
-                        if(password_verify($password, $hashed_password)){
-                            session_start();
-                            
-                            $_SESSION["loggedin"] = true;
-                            $_SESSION["id"] = $id;
-                            $_SESSION["username"] = $username;
-                            $_SESSION["role"] = $role;                            
-                            
-                            header("location: index.php");
-                        } else{
-                            $password_err = "The password you entered was not valid.";
-                        }
-                    }
-                } else{
-                    $username_err = "No account found with that username.";
-                }
-            } else{
-                echo "Oops! Something went wrong. Please try again later.";
-            }
-
-            $stmt->close();
-        }
-    }
-    
-    $conn->close();
 }
 ?>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login - Student Results System</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+<div class="auth-container">
+    <div class="auth-card">
+        <h2>🔑 Login</h2>
+        <?php 
+            if (!empty($_SESSION['logout_message'])) {
+                echo "<div class='alert alert-success'>" . $_SESSION['logout_message'] . "</div>";
+                unset($_SESSION['logout_message']); // remove after showing once
+            }
+            if (!empty($error)) {
+                echo "<div class='alert alert-error'>$error</div>";
+            }
+        ?>
 
-<?php include 'includes/header.php'; ?>
-
-<div class="container">
-    <h2>Login</h2>
-    <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
-        <div class="form-group <?php echo (!empty($username_err)) ? 'has-error' : ''; ?>">
-            <label>Username</label>
-            <input type="text" name="username" class="form-control" value="<?php echo $username; ?>">
-            <span class="help-block"><?php echo $username_err; ?></span>
-        </div>    
-        <div class="form-group <?php echo (!empty($password_err)) ? 'has-error' : ''; ?>">
-            <label>Password</label>
-            <input type="password" name="password" class="form-control">
-            <span class="help-block"><?php echo $password_err; ?></span>
-        </div>
-        <div class="form-group">
-            <input type="submit" class="btn btn-primary" value="Login">
-        </div>
-    </form>
+        <?php if (!empty($error)) { echo "<div class='alert alert-error'>$error</div>"; } ?>
+        <form method="post">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <p>Don’t have an account? <a href="register.php">Register</a></p>
+    </div>
 </div>
-
-<?php include 'includes/footer.php'; ?>
+</body>
+</html>

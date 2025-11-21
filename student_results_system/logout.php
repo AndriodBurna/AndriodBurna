@@ -1,7 +1,12 @@
 <?php
 session_start();
-$_SESSION = array();
+session_unset();
 session_destroy();
-header("location: login.php");
+
+// Store a flash message in the session before redirect
+session_start();
+$_SESSION['logout_message'] = "✅ You have been logged out successfully.";
+
+// Redirect to login
+header("Location: login.php");
 exit;
-?>
