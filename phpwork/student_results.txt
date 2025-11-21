@@ -1,0 +1,2 @@
+{"name":"burna","id":"1010","subject1":50,"subject2":80,"subject3":90,"total":220,"average":73.33,"grade":"C"}
+{"name":"clout","id":"1020","subject1":80,"subject2":40,"subject3":50,"total":170,"average":56.67,"grade":"F"}
